@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from app.database import SessionLocal
 from app.routers import auth, reports, schedules, codes, stats, export, privacy
+from app.routers import notifications
 from app.jobs.cleanup_job import start_scheduler, stop_scheduler
 
 
@@ -20,21 +23,32 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(reports.router)
-app.include_router(schedules.router)
-app.include_router(codes.router)
-app.include_router(stats.router)
-app.include_router(export.router)
-app.include_router(privacy.router)
+PREFIX = "/api/v1"
+
+app.include_router(auth.router, prefix=PREFIX)
+app.include_router(reports.router, prefix=PREFIX)
+app.include_router(schedules.router, prefix=PREFIX)
+app.include_router(codes.router, prefix=PREFIX)
+app.include_router(stats.router, prefix=PREFIX)
+app.include_router(export.router, prefix=PREFIX)
+app.include_router(privacy.router, prefix=PREFIX)
+app.include_router(notifications.router, prefix=PREFIX)
 
 
 @app.get("/health", tags=["health"])
 def health():
-    return {"status": "ok"}
+    db_status = "unavailable"
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        db_status = "connected"
+    except Exception:
+        pass
+    return {"status": "ok" if db_status == "connected" else "error", "db": db_status}

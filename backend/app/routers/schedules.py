@@ -1,61 +1,78 @@
-from typing import Annotated
+from datetime import datetime, timezone
+from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.dependencies import get_current_user, require_roles
+from app.dependencies import require_roles
 from app.models.schedule import Schedule
 from app.models.user import User
-from app.schemas.schedule import ScheduleCreate, ScheduleOut
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
-
-@router.get("/", response_model=list[ScheduleOut])
-def list_schedules(
-    db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(get_current_user)],
-):
-    return db.query(Schedule).order_by(Schedule.day_of_week, Schedule.time).all()
+DAY_NAMES = {0: "Domingo", 1: "Lunes", 2: "Martes", 3: "Miércoles",
+             4: "Jueves", 5: "Viernes", 6: "Sábado"}
 
 
-@router.post("/", response_model=ScheduleOut, status_code=201)
-def create_schedule(
-    body: ScheduleCreate,
-    db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_roles("ADMIN"))],
-):
-    schedule = Schedule(**body.model_dump())
-    db.add(schedule)
-    db.commit()
-    db.refresh(schedule)
-    return schedule
+def _schedule_out(s: Schedule) -> dict:
+    return {
+        "id": s.id,
+        "day_of_week": s.day_of_week,
+        "day_name": DAY_NAMES.get(s.day_of_week, ""),
+        "time": s.time,
+        "label": s.label,
+        "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+    }
 
 
-@router.put("/{schedule_id}", response_model=ScheduleOut)
+@router.get("/")
+def list_schedules(db: Annotated[Session, Depends(get_db)]):
+    schedules = (
+        db.query(Schedule)
+        .order_by(Schedule.day_of_week.asc(), Schedule.time.asc())
+        .all()
+    )
+    return [_schedule_out(s) for s in schedules]
+
+
+class ScheduleUpdate:
+    def __init__(
+        self,
+        day_of_week: Optional[int] = None,
+        time: Optional[str] = None,
+        label: Optional[str] = None,
+    ):
+        self.day_of_week = day_of_week
+        self.time = time
+        self.label = label
+
+
+@router.put("/{schedule_id}")
 def update_schedule(
     schedule_id: str,
-    body: ScheduleCreate,
+    body: dict,
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_roles("ADMIN"))],
 ):
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if not schedule:
         raise HTTPException(status_code=404, detail="Horario no encontrado")
-    for k, v in body.model_dump().items():
-        setattr(schedule, k, v)
+
+    if "day_of_week" in body:
+        val = body["day_of_week"]
+        if not (0 <= val <= 6):
+            raise HTTPException(status_code=422, detail="day_of_week debe estar entre 0 y 6")
+        schedule.day_of_week = val
+
+    if "time" in body:
+        import re
+        if not re.match(r"^\d{2}:\d{2}$", body["time"]):
+            raise HTTPException(status_code=422, detail="time debe tener formato HH:MM")
+        schedule.time = body["time"]
+
+    if "label" in body:
+        schedule.label = body["label"]
+
+    schedule.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(schedule)
-    return schedule
-
-
-@router.delete("/{schedule_id}", status_code=204)
-def delete_schedule(
-    schedule_id: str,
-    db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_roles("ADMIN"))],
-):
-    schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
-    if not schedule:
-        raise HTTPException(status_code=404, detail="Horario no encontrado")
-    db.delete(schedule)
-    db.commit()
+    return _schedule_out(schedule)

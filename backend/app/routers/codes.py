@@ -1,6 +1,8 @@
-import secrets
-from typing import Annotated
+import random
+from datetime import datetime, timezone
+from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import require_roles
@@ -9,51 +11,66 @@ from app.models.user import User
 
 router = APIRouter(prefix="/codes", tags=["codes"])
 
+# Charset sin caracteres ambiguos: O, 0, I, 1
+_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-@router.get("/", response_model=list[dict])
+
+def _code_out(c: AccessCode) -> dict:
+    return {
+        "id": c.id,
+        "code": c.code,
+        "status": c.status,
+        "created_at": c.created_at.isoformat(),
+        "used_at": c.used_at.isoformat() if c.used_at else None,
+    }
+
+
+@router.get("/")
 def list_codes(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_roles("ADMIN"))],
 ):
-    codes = db.query(AccessCode).all()
-    return [
-        {
-            "id": c.id,
-            "code": c.code,
-            "status": c.status,
-            "created_at": c.created_at.isoformat(),
-            "used_at": c.used_at.isoformat() if c.used_at else None,
-        }
-        for c in codes
-    ]
+    codes = db.query(AccessCode).order_by(AccessCode.created_at.desc()).all()
+    counts = {"total": len(codes), "active": 0, "used": 0, "suspended": 0, "revoked": 0}
+    for c in codes:
+        key = c.status.lower()
+        if key in counts:
+            counts[key] += 1
+    return {"codes": [_code_out(c) for c in codes], "summary": counts}
 
 
-@router.post("/generate", response_model=list[dict], status_code=201)
-def generate_codes(
-    count: int = 1,
-    db: Annotated[Session, Depends(get_db)] = None,
-    _: Annotated[User, Depends(require_roles("ADMIN"))] = None,
+@router.post("/", status_code=201)
+def create_code(
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[User, Depends(require_roles("ADMIN"))],
 ):
-    if count < 1 or count > 50:
-        raise HTTPException(status_code=400, detail="count debe estar entre 1 y 50")
-    new_codes = []
-    for _ in range(count):
-        code_str = secrets.token_hex(4).upper()
-        code = AccessCode(code=code_str)
-        db.add(code)
-        new_codes.append(code_str)
-    db.commit()
-    return [{"code": c} for c in new_codes]
+    for _ in range(5):
+        candidate = "".join(random.choices(_CHARSET, k=8))
+        exists = db.query(AccessCode).filter(AccessCode.code == candidate).first()
+        if not exists:
+            code = AccessCode(code=candidate)
+            db.add(code)
+            db.commit()
+            db.refresh(code)
+            return _code_out(code)
+    raise HTTPException(status_code=500, detail="No se pudo generar un código único")
 
 
-@router.delete("/{code_id}", status_code=204)
-def revoke_code(
+class CodeStatusUpdate(BaseModel):
+    status: Literal["SUSPENDED", "REVOKED"]
+
+
+@router.patch("/{code_id}")
+def update_code_status(
     code_id: str,
+    body: CodeStatusUpdate,
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[User, Depends(require_roles("ADMIN"))],
 ):
     code = db.query(AccessCode).filter(AccessCode.id == code_id).first()
     if not code:
         raise HTTPException(status_code=404, detail="Código no encontrado")
-    code.status = "REVOKED"
+    code.status = body.status
     db.commit()
+    db.refresh(code)
+    return _code_out(code)
