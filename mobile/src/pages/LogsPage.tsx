@@ -64,13 +64,11 @@ export function LogsPage() {
                   <td>
                     <span
                       title={entry.error_msg ?? undefined}
-                      className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
-                        entry.status === 'SUCCESS'
-                          ? 'bg-green-100 text-green-800'
-                          : entry.status === 'ERROR'
-                          ? 'bg-red-100 text-red-800 cursor-help'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
+                      className={
+                        entry.status === 'SUCCESS' ? 'badge-success' :
+                        entry.status === 'ERROR'   ? 'badge-error cursor-help' :
+                                                     'badge-neutral'
+                      }
                     >
                       {entry.status ?? '—'}
                     </span>

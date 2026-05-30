@@ -97,4 +97,19 @@ body {
   .page-title     { @apply text-lg font-bold text-slate-800; }
   .section-label  { @apply text-xs font-bold text-slate-400 uppercase tracking-widest; }
   .page-header    { @apply flex items-center justify-between; }
+
+  /* Full-bleed banner that cancels AdminLayout padding (p-4 md:p-6) */
+  .page-banner {
+    @apply -mx-4 -mt-4 md:-mx-6 md:-mt-6 mb-5 bg-slate-800 text-white
+           px-4 md:px-6 py-4 flex items-center justify-between;
+  }
+
+  /* General-purpose log / system status badges */
+  .badge-success { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800; }
+  .badge-error   { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-800; }
+  .badge-neutral { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600; }
+
+  /* Dark-header table variant (define after data-table so it overrides) */
+  .data-table-dark thead tr { @apply bg-slate-800 border-0; }
+  .data-table-dark th       { @apply bg-slate-800 text-white; }
 }

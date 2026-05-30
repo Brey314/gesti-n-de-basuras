@@ -27,10 +27,12 @@ function formatSlot(slot: string) {
 const STATUS_LABELS: Record<string, string> = {
   EMPTY: 'Vacío', HALF: 'Medio', FULL: 'Lleno', OVERFLOW: 'Desbordado',
 }
-const STATUS_COLORS: Record<string, string> = {
-  EMPTY: 'bg-green-500', HALF: 'bg-yellow-400',
-  FULL: 'bg-red-500',   OVERFLOW: 'bg-red-600',
+const STATUS_DOT: Record<string, string> = {
+  EMPTY: 'status-dot-empty', HALF: 'status-dot-half',
+  FULL: 'status-dot-full',  OVERFLOW: 'status-dot-overflow',
 }
+
+// ── Chart components ───────────────────────────────────────────────────────
 
 function DailyChart({ data }: { data: DailyRow[] }) {
   const max = Math.max(...data.map(d => d.count), 1)
@@ -45,23 +47,23 @@ function DailyChart({ data }: { data: DailyRow[] }) {
           const pct = (d.count / max) * 100
           return (
             <div key={d.date} className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 w-7 text-right shrink-0">
+              <span className="text-xs text-slate-500 w-7 text-right shrink-0">
                 {getShortDay(d.date)}
               </span>
-              <div className="flex-1 bg-gray-200 rounded h-5 overflow-hidden">
+              <div className="flex-1 bg-slate-200 rounded h-5 overflow-hidden">
                 <div
                   className="bg-slate-700 h-5 rounded transition-all duration-500"
                   style={{ width: `${pct}%`, minWidth: d.count > 0 ? '4px' : '0' }}
                 />
               </div>
-              <span className="text-xs font-semibold text-gray-700 w-6 text-right shrink-0">
+              <span className="text-xs font-semibold text-slate-700 w-6 text-right shrink-0">
                 {d.count}
               </span>
             </div>
           )
         })}
       </div>
-      <p className="text-xs text-gray-400 mt-3">Promedio diario: {avg} reportes</p>
+      <p className="text-xs text-slate-400 mt-3">Promedio diario: {avg} reportes</p>
     </div>
   )
 }
@@ -85,16 +87,16 @@ function HeatmapChart({ data }: { data: HourlyRow[] }) {
 
           return (
             <div key={row.slot} className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 w-10 text-right shrink-0 font-mono">
+              <span className="text-xs text-slate-500 w-10 text-right shrink-0 font-mono">
                 {row.slot}
               </span>
-              <div className="flex-1 bg-gray-200 rounded h-5 overflow-hidden">
+              <div className="flex-1 bg-slate-200 rounded h-5 overflow-hidden">
                 <div
                   className={`${barColor} h-5 rounded transition-all duration-500`}
                   style={{ width: `${barPct}%`, minWidth: row.count > 0 ? '4px' : '0' }}
                 />
               </div>
-              <span className="text-xs font-semibold text-gray-700 w-14 text-right shrink-0">
+              <span className="text-xs font-semibold text-slate-700 w-14 text-right shrink-0">
                 {row.pct.toFixed(0)}%{row.pct >= 70 ? ' ⚠' : ''}
               </span>
             </div>
@@ -102,13 +104,15 @@ function HeatmapChart({ data }: { data: HourlyRow[] }) {
         })}
       </div>
       {peak.count > 0 && (
-        <p className="text-xs text-gray-400 mt-3">
+        <p className="text-xs text-slate-400 mt-3">
           Pico crítico: {formatSlot(peak.slot)}
         </p>
       )}
     </div>
   )
 }
+
+// ── Page ──────────────────────────────────────────────────────────────────
 
 export function AdminDashboardPage() {
   const { user } = useAuth()
@@ -155,12 +159,12 @@ export function AdminDashboardPage() {
 
   const currentStatus = kpis?.current_status ?? null
   const statusLabel   = currentStatus ? (STATUS_LABELS[currentStatus] ?? currentStatus) : '—'
-  const statusColor   = currentStatus ? (STATUS_COLORS[currentStatus] ?? 'bg-gray-400') : 'bg-gray-300'
+  const dotClass      = currentStatus ? (STATUS_DOT[currentStatus] ?? 'status-dot-empty') : 'w-3 h-3 rounded-full shrink-0 bg-slate-300'
 
   return (
     <div>
-      {/* Page title bar */}
-      <div className="-mx-4 -mt-4 md:-mx-6 md:-mt-6 mb-5 bg-slate-800 text-white px-4 md:px-6 py-4 flex items-center justify-between">
+      {/* Full-bleed page banner */}
+      <div className="page-banner">
         <div className="flex items-center gap-2 font-bold tracking-widest text-sm uppercase">
           <span>♻</span> Dashboard Administrativo
         </div>
@@ -190,9 +194,7 @@ export function AdminDashboardPage() {
             title="Estado actual"
             value={
               <span className="flex items-center gap-2">
-                <span
-                  className={`w-3 h-3 rounded-full shrink-0 ${statusColor}${currentStatus === 'OVERFLOW' ? ' animate-pulse' : ''}`}
-                />
+                <span className={`${dotClass}${currentStatus === 'OVERFLOW' ? ' animate-pulse' : ''}`} />
                 {statusLabel}
               </span>
             }
@@ -211,64 +213,56 @@ export function AdminDashboardPage() {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white rounded shadow overflow-hidden">
-            <div className="bg-slate-700 text-white px-4 py-2 text-xs font-bold flex items-center gap-2 tracking-wider">
-              📋 ACTIVIDAD SEMANAL
-            </div>
-            <div className="p-4">
-              <p className="text-xs text-gray-400 mb-3">Reportes por día (últimos 7 días)</p>
+          <div className="card overflow-hidden">
+            <div className="card-section-header">📋 Actividad semanal</div>
+            <div className="card-body">
+              <p className="text-xs text-slate-400 mb-3">Reportes por día (últimos 7 días)</p>
               <DailyChart data={daily} />
             </div>
           </div>
 
-          <div className="bg-white rounded shadow overflow-hidden">
-            <div className="bg-slate-700 text-white px-4 py-2 text-xs font-bold flex items-center gap-2 tracking-wider">
-              ⏰ MAPA DE CALOR HORARIO
-            </div>
-            <div className="p-4">
-              <p className="text-xs text-gray-400 mb-3">Llenado por franja horaria</p>
+          <div className="card overflow-hidden">
+            <div className="card-section-header">⏰ Mapa de calor horario</div>
+            <div className="card-body">
+              <p className="text-xs text-slate-400 mb-3">Llenado por franja horaria</p>
               <HeatmapChart data={hourly} />
             </div>
           </div>
         </div>
 
         {/* Recent activity */}
-        <div className="bg-white rounded shadow overflow-hidden">
-          <div className="bg-slate-700 text-white px-4 py-2 text-xs font-bold flex items-center gap-2 tracking-wider">
-            📋 Actividad reciente (últimos reportes)
-          </div>
+        <div className="card overflow-hidden">
+          <div className="card-section-header">📋 Actividad reciente</div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="data-table data-table-dark">
               <thead>
-                <tr className="bg-slate-800 text-white text-xs">
-                  <th className="px-4 py-2.5 text-left font-medium">Hora</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Alias</th>
-                  <th className="px-4 py-2.5 text-left font-medium">Reporte</th>
-                  <th className="px-4 py-2.5 text-center font-medium">Estado</th>
+                <tr>
+                  <th>Hora</th>
+                  <th>Alias</th>
+                  <th>Reporte</th>
+                  <th className="text-center">Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {recent.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
+                    <td colSpan={4} className="text-center text-slate-400 py-6">
                       Sin actividad reciente
                     </td>
                   </tr>
                 )}
                 {recent.map((r, i) => (
-                  <tr key={i} className={`border-b last:border-0 ${i % 2 ? 'bg-gray-50' : ''}`}>
-                    <td className="px-4 py-2.5 font-mono text-xs text-gray-600">
+                  <tr key={i}>
+                    <td className="font-mono text-xs">
                       {new Date(r.created_at).toLocaleTimeString('es-CO', {
                         hour: '2-digit', minute: '2-digit',
                       })}
                     </td>
-                    <td className="px-4 py-2.5 text-gray-800">{r.alias}</td>
-                    <td className="px-4 py-2.5 text-gray-700">
-                      {STATUS_LABELS[r.status] ?? r.status}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td>{r.alias}</td>
+                    <td>{STATUS_LABELS[r.status] ?? r.status}</td>
+                    <td className="text-center">
                       <span
-                        className={`inline-block w-3 h-3 rounded-full ${STATUS_COLORS[r.status] ?? 'bg-gray-400'}${r.status === 'OVERFLOW' ? ' animate-pulse' : ''}`}
+                        className={`inline-block ${STATUS_DOT[r.status] ?? 'status-dot-empty'}${r.status === 'OVERFLOW' ? ' animate-pulse' : ''}`}
                       />
                     </td>
                   </tr>
@@ -276,7 +270,7 @@ export function AdminDashboardPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-gray-400 px-4 py-2 border-t">
+          <p className="text-xs text-slate-400 px-4 py-2 border-t border-slate-100">
             Los reportes individuales se eliminan automáticamente a los 30 días.
           </p>
         </div>
