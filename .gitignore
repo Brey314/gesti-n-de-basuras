@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+*.egg
+
+# Environment
+.env
+*.env.local
+
+# SQLite
+*.db
+*.sqlite3
+
+# Alembic
+backend/alembic/versions/*.pyc
+
+# Logs
+backend/logs/*.log
+
+# Node / React / Expo
+node_modules/
+.expo/
+dist/
+build/
+*.tsbuildinfo
+.next/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+htmlcov/
