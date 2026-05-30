@@ -6,13 +6,18 @@ interface Report { id: string; status: string; created_at: string; days_until_ex
 const STATUS_LABELS: Record<string, string> = {
   EMPTY: 'Vacío', HALF: 'Medio', FULL: 'Lleno', OVERFLOW: 'Desbordado',
 }
-const STATUS_COLORS: Record<string, string> = {
-  EMPTY: '#16a34a', HALF: '#ca8a04', FULL: '#dc2626', OVERFLOW: '#991b1b',
+const STATUS_DOT: Record<string, string> = {
+  EMPTY: 'status-dot-empty', HALF: 'status-dot-half',
+  FULL: 'status-dot-full',  OVERFLOW: 'status-dot-overflow',
+}
+const STATUS_TEXT: Record<string, string> = {
+  EMPTY: 'text-status-empty', HALF: 'text-status-half',
+  FULL: 'text-status-full',  OVERFLOW: 'text-status-overflow',
 }
 
 export function HistoryPage() {
-  const [reports,   setReports]   = useState<Report[]>([])
-  const [loading,   setLoading]   = useState(true)
+  const [reports,    setReports]    = useState<Report[]>([])
+  const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const load = async () => {
@@ -27,7 +32,7 @@ export function HistoryPage() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -40,40 +45,41 @@ export function HistoryPage() {
   )
 
   return (
-    <div className="p-5 space-y-3">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-          Tus reportes — últimos 30 días
-        </p>
+    <div className="page-container">
+      <div className="page-header">
+        <p className="section-label">Tus reportes — últimos 30 días</p>
         <button
           onClick={() => { setRefreshing(true); load() }}
-          className="text-xs text-green-600 font-semibold"
+          className="btn btn-ghost btn-sm"
         >
           {refreshing ? '…' : '↻ Actualizar'}
         </button>
       </div>
 
-      {reports.map((r) => {
-        const color = STATUS_COLORS[r.status] ?? '#94a3b8'
-        const date  = new Date(r.created_at).toLocaleString('es-CO', {
-          day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-        })
-        return (
-          <div key={r.id} className="bg-white rounded-2xl shadow px-5 py-4 flex items-center gap-4">
-            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm" style={{ color }}>
-                {STATUS_LABELS[r.status] ?? r.status}
-              </p>
-              <p className="text-xs text-slate-400 mt-0.5 truncate">{date}</p>
+      <div className="space-y-2">
+        {reports.map((r) => {
+          const dotClass  = STATUS_DOT[r.status]  ?? 'status-dot-empty'
+          const textClass = STATUS_TEXT[r.status] ?? 'text-slate-500'
+          const date = new Date(r.created_at).toLocaleString('es-CO', {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+          })
+          return (
+            <div key={r.id} className="card px-5 py-4 flex items-center gap-4">
+              <div className={dotClass} />
+              <div className="flex-1 min-w-0">
+                <p className={`font-bold text-sm ${textClass}`}>
+                  {STATUS_LABELS[r.status] ?? r.status}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5 truncate">{date}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-xl font-black text-slate-700">{r.days_until_expiry}</p>
+                <p className="text-xs text-slate-400">días</p>
+              </div>
             </div>
-            <div className="text-right shrink-0">
-              <p className="text-xl font-black text-slate-700">{r.days_until_expiry}</p>
-              <p className="text-xs text-slate-400">días</p>
-            </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }

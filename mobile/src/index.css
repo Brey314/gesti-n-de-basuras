@@ -1,13 +1,18 @@
 @import "tailwindcss";
 
-/* Limita el ancho a pantalla de móvil y centra en desktop */
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+@theme {
+  --color-status-empty:    #16a34a;
+  --color-status-half:     #ca8a04;
+  --color-status-full:     #dc2626;
+  --color-status-overflow: #991b1b;
+  --color-brand:           #16a34a;
+  --color-brand-dark:      #166534;
+}
+
 #root {
-  max-width: 430px;
-  margin: 0 auto;
   min-height: 100svh;
   position: relative;
-  background: #f1f5f9;
-  box-shadow: 0 0 40px rgba(0,0,0,.12);
 }
 
 body {
@@ -18,3 +23,78 @@ body {
 }
 
 * { box-sizing: border-box; }
+
+/* ── Component classes ─────────────────────────────────────────────────── */
+@layer components {
+
+  /* Buttons — use as: <button class="btn btn-primary"> */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-semibold text-sm rounded-xl
+           px-4 py-2.5 transition-all duration-150 active:scale-[.98] select-none
+           disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+  }
+  .btn-primary  { @apply bg-brand text-white hover:opacity-90; }
+  .btn-secondary{ @apply bg-slate-100 text-slate-700 hover:bg-slate-200; }
+  .btn-danger   { @apply bg-red-50 text-red-700 hover:bg-red-100 border border-red-200; }
+  .btn-outline  { @apply border border-slate-200 text-slate-700 bg-white hover:bg-slate-50; }
+  .btn-warning  { @apply bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200; }
+  .btn-blue     { @apply bg-blue-600 text-white hover:bg-blue-700; }
+  .btn-ghost    { @apply text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg; }
+  .btn-sm       { @apply !text-xs !px-3 !py-1.5 !rounded-lg; }
+  .btn-lg       { @apply !text-base !px-6 !py-4 !rounded-2xl; }
+  .btn-full     { @apply w-full; }
+
+  /* Cards */
+  .card { @apply bg-white rounded-2xl shadow-sm border border-slate-100; }
+  .card-header {
+    @apply px-5 py-3.5 border-b border-slate-100 flex items-center justify-between;
+  }
+  .card-body { @apply p-5; }
+  .card-section-header {
+    @apply bg-slate-700 text-white px-4 py-2 text-xs font-bold tracking-wider uppercase
+           flex items-center gap-2;
+  }
+
+  /* Form elements */
+  .field-label  { @apply block text-sm font-semibold text-slate-700 mb-1.5; }
+  .field-input  {
+    @apply w-full border border-slate-200 rounded-xl px-4 py-3 text-sm bg-slate-50
+           focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition;
+  }
+  .field-select {
+    @apply border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-white
+           focus:outline-none focus:ring-2 focus:ring-brand;
+  }
+  .field-time {
+    @apply border border-slate-200 rounded-lg px-2 py-1.5 text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand;
+  }
+
+  /* Status indicators */
+  .status-dot-empty    { @apply w-3 h-3 rounded-full shrink-0 bg-status-empty; }
+  .status-dot-half     { @apply w-3 h-3 rounded-full shrink-0 bg-status-half; }
+  .status-dot-full     { @apply w-3 h-3 rounded-full shrink-0 bg-status-full; }
+  .status-dot-overflow { @apply w-3 h-3 rounded-full shrink-0 bg-status-overflow; }
+
+  .status-badge-empty    { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800; }
+  .status-badge-half     { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800; }
+  .status-badge-full     { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800; }
+  .status-badge-overflow { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-200 text-red-900; }
+
+  /* Data tables */
+  .data-table { @apply w-full text-sm; }
+  .data-table th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide bg-slate-50;
+  }
+  .data-table td { @apply px-4 py-3 text-slate-700; }
+  .data-table thead tr { @apply border-b border-slate-200; }
+  .data-table tbody tr {
+    @apply border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/60;
+  }
+
+  /* Page structure */
+  .page-container { @apply p-5 space-y-5; }
+  .page-title     { @apply text-lg font-bold text-slate-800; }
+  .section-label  { @apply text-xs font-bold text-slate-400 uppercase tracking-widest; }
+  .page-header    { @apply flex items-center justify-between; }
+}

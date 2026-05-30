@@ -13,15 +13,24 @@ interface CurrentReport {
 const STATUS_LABELS: Record<string, string> = {
   EMPTY: 'VACÍO', HALF: 'MEDIO', FULL: 'LLENO', OVERFLOW: 'DESBORDADO',
 }
-const STATUS_COLORS: Record<string, string> = {
-  EMPTY: '#16a34a', HALF: '#ca8a04', FULL: '#dc2626', OVERFLOW: '#991b1b',
+const STATUS_BG: Record<string, string> = {
+  EMPTY: 'bg-status-empty', HALF: 'bg-status-half',
+  FULL: 'bg-status-full',  OVERFLOW: 'bg-status-overflow',
+}
+const STATUS_TEXT: Record<string, string> = {
+  EMPTY: 'text-status-empty', HALF: 'text-status-half',
+  FULL: 'text-status-full',  OVERFLOW: 'text-status-overflow',
+}
+const STATUS_DOT: Record<string, string> = {
+  EMPTY: 'status-dot-empty', HALF: 'status-dot-half',
+  FULL: 'status-dot-full',  OVERFLOW: 'status-dot-overflow',
 }
 
 const REPORT_OPTIONS = [
-  { key: 'EMPTY',    emoji: '🟢', label: 'VACÍO',      color: '#16a34a' },
-  { key: 'HALF',     emoji: '🟡', label: 'MEDIO',      color: '#ca8a04' },
-  { key: 'FULL',     emoji: '🔴', label: 'LLENO',      color: '#dc2626' },
-  { key: 'OVERFLOW', emoji: '🚨', label: 'DESBORDADO', color: '#991b1b' },
+  { key: 'EMPTY',    emoji: '🟢', label: 'VACÍO',      textClass: 'text-status-empty',    borderClass: 'border-status-empty' },
+  { key: 'HALF',     emoji: '🟡', label: 'MEDIO',      textClass: 'text-status-half',     borderClass: 'border-status-half' },
+  { key: 'FULL',     emoji: '🔴', label: 'LLENO',      textClass: 'text-status-full',     borderClass: 'border-status-full' },
+  { key: 'OVERFLOW', emoji: '🚨', label: 'DESBORDADO', textClass: 'text-status-overflow', borderClass: 'border-status-overflow' },
 ]
 
 export function HomePage() {
@@ -43,7 +52,6 @@ export function HomePage() {
     return () => clearInterval(id)
   }, [])
 
-  // Cierra el sheet al tocar fuera
   useEffect(() => {
     if (!sheet) return
     const handler = (e: MouseEvent) => {
@@ -64,31 +72,33 @@ export function HomePage() {
     }
   }
 
-  const status = report?.status ?? null
-  const color  = status ? (STATUS_COLORS[status] ?? '#94a3b8') : '#94a3b8'
-  const label  = status ? (STATUS_LABELS[status] ?? status) : 'Sin datos'
+  const status    = report?.status ?? null
+  const bgClass   = status ? (STATUS_BG[status]   ?? 'bg-slate-300')  : 'bg-slate-300'
+  const textClass = status ? (STATUS_TEXT[status] ?? 'text-slate-400') : 'text-slate-400'
+  const dotClass  = status ? (STATUS_DOT[status]  ?? 'status-dot-empty') : ''
+  const label     = status ? (STATUS_LABELS[status] ?? status) : 'Sin datos'
 
   return (
-    <div className="p-5 space-y-4">
+    <div className="page-container">
       {/* Estado actual */}
-      <div className="bg-white rounded-2xl shadow p-6 flex flex-col items-center gap-4">
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Estado del contenedor</p>
+      <div className="card card-body flex flex-col items-center gap-4">
+        <p className="section-label">Estado del contenedor</p>
 
         {/* Círculo con pulso para OVERFLOW */}
         <div className="relative flex items-center justify-center">
           {status === 'OVERFLOW' && (
             <span
-              className="absolute inline-flex rounded-full opacity-60 animate-ping"
-              style={{ width: 120, height: 120, backgroundColor: color }}
+              className={`absolute inline-flex rounded-full opacity-60 animate-ping ${bgClass}`}
+              style={{ width: 120, height: 120 }}
             />
           )}
           <div
-            className="rounded-full transition-colors duration-500"
-            style={{ width: 120, height: 120, backgroundColor: color }}
+            className={`rounded-full transition-colors duration-500 ${bgClass}`}
+            style={{ width: 120, height: 120 }}
           />
         </div>
 
-        <p className="text-3xl font-black" style={{ color }}>{label}</p>
+        <p className={`text-3xl font-black ${textClass}`}>{label}</p>
 
         {report?.alias && report?.minutes_ago !== undefined && (
           <p className="text-sm text-slate-400 text-center">
@@ -99,21 +109,21 @@ export function HomePage() {
           <p className="text-sm text-slate-400">{report.message}</p>
         )}
         {report?.warning && (
-          <div className="w-full bg-yellow-50 border-l-4 border-yellow-400 rounded-r-xl px-4 py-2">
-            <p className="text-xs text-yellow-700 font-medium">⚠ {report.warning}</p>
+          <div className="w-full bg-amber-50 border-l-4 border-amber-400 rounded-r-xl px-4 py-2">
+            <p className="text-xs text-amber-700 font-medium">⚠ {report.warning}</p>
           </div>
         )}
       </div>
 
-      {/* Botón reportar (toque 1) */}
+      {/* Botón reportar */}
       <button
         onClick={() => setSheet(true)}
-        className="w-full bg-green-600 text-white py-5 rounded-2xl text-lg font-black shadow-lg active:scale-[.98] transition-transform"
+        className="btn btn-primary btn-full btn-lg shadow-md"
       >
-        📣  REPORTAR ESTADO
+        📣 REPORTAR ESTADO
       </button>
 
-      {/* Bottom sheet (toque 2 → 3) */}
+      {/* Bottom sheet */}
       {sheet && (
         <div className="fixed inset-0 bg-black/40 z-40 flex items-end">
           <div ref={sheetRef} className="w-full max-w-[430px] mx-auto bg-white rounded-t-2xl p-6 pb-10 space-y-3 animate-[slideUp_.25s_ease-out]">
@@ -122,14 +132,23 @@ export function HomePage() {
               <button
                 key={opt.key}
                 onClick={() => handleReport(opt.key)}
-                className="w-full flex items-center gap-4 py-4 px-5 rounded-xl border-2 font-bold text-lg active:scale-[.98] transition-transform"
-                style={{ borderColor: opt.color, color: opt.color }}
+                className={`w-full flex items-center gap-4 py-4 px-5 rounded-xl border-2 font-bold text-lg active:scale-[.98] transition-transform ${opt.textClass} ${opt.borderClass}`}
               >
                 <span className="text-2xl">{opt.emoji}</span>
                 {opt.label}
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Desktop: indicator dot below button for extra context */}
+      {status && (
+        <div className="hidden md:flex items-center gap-3 px-1">
+          <div className={dotClass} />
+          <span className="text-sm text-slate-500">
+            Último estado registrado: <span className={`font-semibold ${textClass}`}>{label}</span>
+          </span>
         </div>
       )}
     </div>

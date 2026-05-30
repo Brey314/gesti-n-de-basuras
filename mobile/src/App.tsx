@@ -1,14 +1,26 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { AuthProvider } from './auth/AuthContext'
+import { AuthProvider, useAuth } from './auth/AuthContext'
 import { PrivateRoute } from './auth/PrivateRoute'
 import { ToastProvider } from './components/Toast'
-import { Layout } from './components/Layout'
-import { Login }        from './pages/Login'
-import { HomePage }     from './pages/HomePage'
-import { SchedulesPage } from './pages/SchedulesPage'
-import { HistoryPage }  from './pages/HistoryPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { PolicyPage }   from './pages/PolicyPage'
+import { ResidentLayout }      from './components/ResidentLayout'
+import { AdminLayout }         from './components/AdminLayout'
+import { Login }               from './pages/Login'
+import { HomePage }            from './pages/HomePage'
+import { SchedulesPage }       from './pages/SchedulesPage'
+import { HistoryPage }         from './pages/HistoryPage'
+import { SettingsPage }        from './pages/SettingsPage'
+import { PolicyPage }          from './pages/PolicyPage'
+import { AdminDashboardPage }  from './pages/AdminDashboardPage'
+import { CodesPage }           from './pages/CodesPage'
+import { AdminSchedulesPage }  from './pages/AdminSchedulesPage'
+import { ExportPage }          from './pages/ExportPage'
+import { LogsPage }            from './pages/LogsPage'
+
+function RoleAwareRedirect() {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  return <Navigate to={user.role === 'ADMIN' ? '/dashboard' : '/'} replace />
+}
 
 export default function App() {
   return (
@@ -16,19 +28,33 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <Routes>
+            {/* Public */}
             <Route path="/login"  element={<Login />} />
             <Route path="/policy" element={<PolicyPage />} />
 
-            <Route element={<PrivateRoute />}>
-              <Route element={<Layout />}>
-                <Route index        element={<HomePage />} />
-                <Route path="schedules" element={<SchedulesPage />} />
-                <Route path="history"   element={<HistoryPage />} />
-                <Route path="settings"  element={<SettingsPage />} />
+            {/* Resident routes — ADMIN can also visit these */}
+            <Route element={<PrivateRoute roles={['RESIDENT', 'ADMIN']} />}>
+              <Route element={<ResidentLayout />}>
+                <Route index             element={<HomePage />} />
+                <Route path="schedules"  element={<SchedulesPage />} />
+                <Route path="history"    element={<HistoryPage />} />
+                <Route path="settings"   element={<SettingsPage />} />
               </Route>
             </Route>
 
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Admin routes */}
+            <Route element={<PrivateRoute roles={['ADMIN']} />}>
+              <Route element={<AdminLayout />}>
+                <Route path="dashboard"       element={<AdminDashboardPage />} />
+                <Route path="admin/codes"     element={<CodesPage />} />
+                <Route path="admin/schedules" element={<AdminSchedulesPage />} />
+                <Route path="admin/export"    element={<ExportPage />} />
+                <Route path="admin/logs"      element={<LogsPage />} />
+              </Route>
+            </Route>
+
+            {/* Role-aware fallback */}
+            <Route path="*" element={<RoleAwareRedirect />} />
           </Routes>
         </ToastProvider>
       </AuthProvider>

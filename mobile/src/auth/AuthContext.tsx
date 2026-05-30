@@ -5,7 +5,7 @@ interface User { alias: string; role: string }
 
 interface AuthContextValue {
   user: User | null
-  login: (alias: string, code: string) => Promise<void>
+  login: (alias: string, code: string) => Promise<string>
   logout: () => void
 }
 
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('auth:logout', handler)
   }, [])
 
-  const login = async (alias: string, code: string) => {
+  const login = async (alias: string, code: string): Promise<string> => {
     let data: { access_token: string; alias: string; role: string }
     try {
       const res = await api.post('/auth/login', { alias, code })
@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const u = { alias: data.alias, role: data.role }
     localStorage.setItem(USER_KEY, JSON.stringify(u))
     setUser(u)
+    return data.role
   }
 
   const logout = () => {

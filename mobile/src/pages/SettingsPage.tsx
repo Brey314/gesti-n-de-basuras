@@ -26,7 +26,7 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange?: (v: boolea
       aria-checked={on}
       disabled={disabled}
       onClick={() => onChange?.(!on)}
-      className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${on ? 'bg-green-500' : 'bg-slate-200'} disabled:opacity-60`}
+      className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${on ? 'bg-brand' : 'bg-slate-200'} disabled:opacity-60`}
     >
       <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${on ? 'left-6' : 'left-0.5'}`} />
     </button>
@@ -69,11 +69,12 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-5 space-y-6 pb-8">
+    <div className="page-container pb-8">
+
       {/* Notificaciones */}
       <section>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Notificaciones</p>
-        <div className="bg-white rounded-2xl shadow divide-y divide-slate-100">
+        <p className="section-label mb-3">Notificaciones</p>
+        <div className="card divide-y divide-slate-100">
           {PREFS.map((p) => (
             <div key={p.key} className="flex items-center gap-4 px-5 py-4">
               <div className="flex-1 min-w-0">
@@ -92,8 +93,8 @@ export function SettingsPage() {
 
       {/* Mis datos */}
       <section>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Mis datos</p>
-        <div className="bg-white rounded-2xl shadow divide-y divide-slate-100">
+        <p className="section-label mb-3">Mis datos</p>
+        <div className="card divide-y divide-slate-100">
           {[
             { label: 'Alias',        value: data?.alias ?? '—' },
             { label: 'Rol',          value: data?.role  ?? '—' },
@@ -110,24 +111,24 @@ export function SettingsPage() {
         {!confirm ? (
           <button
             onClick={() => setConfirm(true)}
-            className="w-full mt-3 bg-red-50 border border-red-200 text-red-600 py-3.5 rounded-2xl text-sm font-semibold active:scale-[.98] transition-transform"
+            className="btn btn-danger btn-full mt-3"
           >
             🗑 Eliminar mi cuenta y datos
           </button>
         ) : (
-          <div className="mt-3 bg-red-50 border border-red-200 rounded-2xl p-5 space-y-3">
+          <div className="mt-3 card card-body space-y-3 border-red-200">
             <p className="text-sm font-bold text-red-700 text-center">Esta acción es irreversible</p>
             <p className="text-xs text-red-500 text-center">Se eliminarán todos tus reportes y datos</p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirm(false)}
-                className="flex-1 bg-white border border-slate-200 text-slate-600 py-3 rounded-xl text-sm font-semibold"
+                className="btn btn-outline flex-1"
               >
                 Cancelar
               </button>
               <button
                 onClick={deleteAccount}
-                className="flex-1 bg-red-600 text-white py-3 rounded-xl text-sm font-bold"
+                className="btn btn-danger flex-1"
               >
                 Eliminar todo
               </button>
@@ -138,9 +139,9 @@ export function SettingsPage() {
 
       {/* Información */}
       <section>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Información</p>
-        <div className="bg-white rounded-2xl shadow divide-y divide-slate-100">
-          <Link to="/policy" className="flex items-center justify-between px-5 py-4">
+        <p className="section-label mb-3">Información</p>
+        <div className="card divide-y divide-slate-100">
+          <Link to="/policy" className="flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors">
             <span className="text-sm text-slate-700">📄 Política de tratamiento de datos</span>
             <span className="text-slate-400">›</span>
           </Link>
