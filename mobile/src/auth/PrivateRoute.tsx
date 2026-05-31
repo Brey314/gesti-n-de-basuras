@@ -9,7 +9,9 @@ interface Props {
 export function PrivateRoute({ children, roles }: Props) {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
-  if (roles && !roles.includes(user.role))
-    return <Navigate to={user.role === 'ADMIN' ? '/dashboard' : '/'} replace />
+  if (roles && !roles.includes(user.role)) {
+    const dest = user.role === 'RESIDENT' ? '/' : '/dashboard'
+    return <Navigate to={dest} replace />
+  }
   return children ? <>{children}</> : <Outlet />
 }

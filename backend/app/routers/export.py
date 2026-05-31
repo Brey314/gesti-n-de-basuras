@@ -78,7 +78,7 @@ def export_csv(
 @router.get("/poster")
 def export_poster(
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER"))],
+    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER", "VIEWER"))],
 ):
     now = datetime.now(timezone.utc)
     since_30 = now - timedelta(days=30)

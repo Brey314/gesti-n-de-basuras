@@ -15,6 +15,7 @@ PUSH_MESSAGES = {
     "PUSH04": "Camión recolector pasó hace 10 min. Contenedor disponible nuevamente.",
     "PUSH05": "Importante: el horario de recolección de {day} cambia a las {time} desde la próxima semana.",
     "PUSH06": "Tip: las bolsas bien cerradas evitan que los perros las rompan. ¡Cuidemos entre todos!",
+    "PUSH07": "Tus reportes de hace 30 días fueron eliminados automáticamente, como prometimos.",
 }
 
 _TIP_FILE = Path("logs/last_tip.txt")
@@ -47,7 +48,7 @@ def _send_in_batches(tokens: list[str], title: str, body: str) -> int:
     return sent
 
 
-def get_tokens_for_pref(pref_field: str, db: Session, check_inactive: bool = True) -> list[str]:
+def get_tokens_for_pref(pref_field: str, db: Session, respect_inactivity: bool = True) -> list[str]:
     cutoff = datetime.now(timezone.utc) - timedelta(days=14)
     query = (
         db.query(User.push_token)
@@ -57,7 +58,7 @@ def get_tokens_for_pref(pref_field: str, db: Session, check_inactive: bool = Tru
             User.push_token.isnot(None),
         )
     )
-    if check_inactive:
+    if respect_inactivity:
         query = query.filter(User.last_seen >= cutoff)
     return [row[0] for row in query.all()]
 
@@ -72,7 +73,7 @@ def send_truck_reminder(schedule_time: str, db: Session) -> int:
 
 def send_bin_alert(status: str, db: Session) -> int:
     if status == "OVERFLOW":
-        tokens = get_tokens_for_pref("push03", db, check_inactive=False)
+        tokens = get_tokens_for_pref("push03", db, respect_inactivity=False)
         body = PUSH_MESSAGES["PUSH03"]
         return _send_in_batches(tokens, "Contenedor desbordado", body)
     if status == "FULL":
@@ -92,7 +93,7 @@ def send_collection_confirmed(db: Session) -> int:
 
 
 def send_schedule_change(new_time: str, day_name: str, db: Session) -> int:
-    tokens = get_tokens_for_pref("push05", db, check_inactive=False)
+    tokens = get_tokens_for_pref("push05", db, respect_inactivity=False)
     body = PUSH_MESSAGES["PUSH05"].format(day=day_name, time=new_time)
     return _send_in_batches(tokens, "Cambio de horario", body)
 
@@ -113,10 +114,41 @@ def send_citizenship_tip(db: Session) -> int:
         except Exception:
             pass
 
-    tokens = get_tokens_for_pref("push06", db)
+    # Inactivos >14 días siguen recibiendo el tip semanal (es su única notificación permitida)
+    tokens = get_tokens_for_pref("push06", db, respect_inactivity=False)
     sent = _send_in_batches(tokens, "Tip ciudadano", PUSH_MESSAGES["PUSH06"])
 
     if sent > 0:
         _TIP_FILE.write_text(datetime.now(timezone.utc).isoformat())
 
     return sent
+
+
+def send_auto_delete_notice(affected_user_ids: list[str], db: Session) -> int:
+    """Notifica a usuarios cuyos reportes expirados fueron eliminados (PUSH07)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=14)
+    rows = (
+        db.query(User.push_token)
+        .join(NotifPref, NotifPref.user_id == User.id)
+        .filter(
+            User.id.in_(affected_user_ids),
+            NotifPref.push07 == True,  # noqa: E712
+            User.push_token.isnot(None),
+            User.last_seen >= cutoff,
+        )
+        .all()
+    )
+    tokens = [r[0] for r in rows]
+    return _send_in_batches(tokens, "Reportes eliminados", PUSH_MESSAGES["PUSH07"])
+
+
+def send_admin_failure_alert(msg: str, db: Session) -> int:
+    """Avisa a todos los administradores cuando falla el job de limpieza."""
+    rows = (
+        db.query(User.push_token)
+        .filter(User.role == "ADMIN", User.push_token.isnot(None))
+        .all()
+    )
+    tokens = [r[0] for r in rows]
+    body = msg[:200] if msg else "Error desconocido"
+    return _send_in_batches(tokens, "Error en limpieza automática", body)

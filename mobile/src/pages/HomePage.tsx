@@ -1,30 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import api from '../api/client'
 import { useToast } from '../components/Toast'
-
-interface CurrentReport {
-  status: string | null
-  alias?: string
-  minutes_ago?: number
-  message?: string
-  warning?: string
-}
+import { ContainerMap, type ContainerData } from '../components/ContainerMap'
 
 const STATUS_LABELS: Record<string, string> = {
   EMPTY: 'VACÍO', HALF: 'MEDIO', FULL: 'LLENO', OVERFLOW: 'DESBORDADO',
-}
-const STATUS_BG: Record<string, string> = {
-  EMPTY: 'bg-status-empty', HALF: 'bg-status-half',
-  FULL: 'bg-status-full',  OVERFLOW: 'bg-status-overflow',
 }
 const STATUS_TEXT: Record<string, string> = {
   EMPTY: 'text-status-empty', HALF: 'text-status-half',
   FULL: 'text-status-full',  OVERFLOW: 'text-status-overflow',
 }
-const STATUS_DOT: Record<string, string> = {
-  EMPTY: 'status-dot-empty', HALF: 'status-dot-half',
-  FULL: 'status-dot-full',  OVERFLOW: 'status-dot-overflow',
-}
+const OVERFLOW_ORDER = ['OVERFLOW', 'FULL', 'HALF', 'EMPTY']
 
 const REPORT_OPTIONS = [
   { key: 'EMPTY',    emoji: '🟢', label: 'VACÍO',      textClass: 'text-status-empty',    borderClass: 'border-status-empty' },
@@ -33,122 +19,247 @@ const REPORT_OPTIONS = [
   { key: 'OVERFLOW', emoji: '🚨', label: 'DESBORDADO', textClass: 'text-status-overflow', borderClass: 'border-status-overflow' },
 ]
 
+async function pixelateImage(file: File, pixelSize = 10): Promise<Blob> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const maxW = 800
+      const scale = img.width > maxW ? maxW / img.width : 1
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')!
+      const sw = Math.max(1, Math.ceil(w / pixelSize))
+      const sh = Math.max(1, Math.ceil(h / pixelSize))
+      ctx.drawImage(img, 0, 0, sw, sh)
+      ctx.imageSmoothingEnabled = false
+      ctx.drawImage(canvas, 0, 0, sw, sh, 0, 0, w, h)
+      canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.85)
+    }
+    img.src = URL.createObjectURL(file)
+  })
+}
+
+function worstStatus(containers: ContainerData[]): string | null {
+  for (const s of OVERFLOW_ORDER) {
+    if (containers.some((c) => c.current_status === s)) return s
+  }
+  return null
+}
+
 export function HomePage() {
   const { showToast } = useToast()
-  const [report,   setReport]   = useState<CurrentReport | null>(null)
-  const [sheet,    setSheet]    = useState(false)
-  const sheetRef               = useRef<HTMLDivElement>(null)
+  const [containers, setContainers] = useState<ContainerData[]>([])
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [sheet, setSheet] = useState(false)
+  const [step, setStep] = useState<'status' | 'photo'>('status')
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const sheetRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const fetchCurrent = async () => {
+  const fetchContainers = async () => {
     try {
-      const res = await api.get('/reports/current')
-      setReport(res.data)
+      const res = await api.get('/containers/')
+      setContainers(res.data)
     } catch { /* silent */ }
   }
 
   useEffect(() => {
-    fetchCurrent()
-    const id = setInterval(fetchCurrent, 30_000)
+    fetchContainers()
+    const id = setInterval(fetchContainers, 30_000)
     return () => clearInterval(id)
   }, [])
 
   useEffect(() => {
     if (!sheet) return
     const handler = (e: MouseEvent) => {
-      if (sheetRef.current && !sheetRef.current.contains(e.target as Node)) setSheet(false)
+      if (sheetRef.current && !sheetRef.current.contains(e.target as Node)) closeSheet()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [sheet])
 
-  const handleReport = async (status: string) => {
+  const openSheet = (id: number) => {
+    setSelectedId(id)
+    setStep('status')
+    setPendingStatus(null)
+    setPhotoFile(null)
+    setPhotoPreviewUrl(null)
+    setSheet(true)
+  }
+
+  const closeSheet = () => {
     setSheet(false)
+    setPhotoPreviewUrl(null)
+  }
+
+  const handleStatusSelect = (status: string) => {
+    setPendingStatus(status)
+    setStep('photo')
+  }
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    const blob = await pixelateImage(file)
+    setPhotoPreviewUrl(URL.createObjectURL(blob))
+  }
+
+  const handleSubmit = async () => {
+    if (!pendingStatus) return
+    setSubmitting(true)
     try {
-      await api.post('/reports/', { status })
+      const res = await api.post('/reports/', {
+        status: pendingStatus,
+        container_id: selectedId,
+      })
+      if (photoFile) {
+        const blob = await pixelateImage(photoFile)
+        const fd = new FormData()
+        fd.append('file', blob, 'photo.jpg')
+        await api.post(`/reports/${res.data.id}/photo`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+      }
       showToast('Reporte enviado ✓', 'success')
-      fetchCurrent()
+      closeSheet()
+      fetchContainers()
     } catch {
       showToast('Error al enviar el reporte', 'error')
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  const status    = report?.status ?? null
-  const bgClass   = status ? (STATUS_BG[status]   ?? 'bg-slate-300')  : 'bg-slate-300'
-  const textClass = status ? (STATUS_TEXT[status] ?? 'text-slate-400') : 'text-slate-400'
-  const dotClass  = status ? (STATUS_DOT[status]  ?? 'status-dot-empty') : ''
-  const label     = status ? (STATUS_LABELS[status] ?? status) : 'Sin datos'
+  const selectedContainer = containers.find((c) => c.id === selectedId)
+  const worst = worstStatus(containers)
+  const worstLabel = worst ? STATUS_LABELS[worst] : null
+  const worstTextClass = worst ? (STATUS_TEXT[worst] ?? 'text-slate-400') : 'text-slate-400'
 
   return (
     <div className="page-container">
-      {/* Estado actual */}
-      <div className="card card-body flex flex-col items-center gap-4">
-        <p className="section-label">Estado del contenedor</p>
-
-        {/* Círculo con pulso para OVERFLOW */}
-        <div className="relative flex items-center justify-center">
-          {status === 'OVERFLOW' && (
-            <span
-              className={`absolute inline-flex rounded-full opacity-60 animate-ping ${bgClass}`}
-              style={{ width: 120, height: 120 }}
-            />
-          )}
-          <div
-            className={`rounded-full transition-colors duration-500 ${bgClass}`}
-            style={{ width: 120, height: 120 }}
-          />
-        </div>
-
-        <p className={`text-3xl font-black ${textClass}`}>{label}</p>
-
-        {report?.alias && report?.minutes_ago !== undefined && (
-          <p className="text-sm text-slate-400 text-center">
-            Último reporte hace <strong>{report.minutes_ago}</strong> min por <strong>{report.alias}</strong>
+      {/* Mapa de contenedores */}
+      <div className="card card-body space-y-3">
+        <p className="section-label">Estado de los contenedores</p>
+        <ContainerMap
+          containers={containers}
+          selectedId={selectedId}
+          onSelect={openSheet}
+        />
+        {containers.length === 0 && (
+          <p className="text-sm text-slate-400 text-center py-4">Cargando contenedores…</p>
+        )}
+        {worst && (
+          <p className="text-sm text-center text-slate-500">
+            Estado general:{' '}
+            <span className={`font-bold ${worstTextClass}`}>{worstLabel}</span>
           </p>
         )}
-        {!status && report?.message && (
-          <p className="text-sm text-slate-400">{report.message}</p>
-        )}
-        {report?.warning && (
-          <div className="w-full bg-amber-50 border-l-4 border-amber-400 rounded-r-xl px-4 py-2">
-            <p className="text-xs text-amber-700 font-medium">⚠ {report.warning}</p>
-          </div>
+        {!worst && containers.length > 0 && (
+          <p className="text-sm text-center text-slate-400">Sin reportes recientes</p>
         )}
       </div>
 
-      {/* Botón reportar */}
-      <button
-        onClick={() => setSheet(true)}
-        className="btn btn-primary btn-full btn-lg shadow-md"
-      >
-        📣 REPORTAR ESTADO
-      </button>
+      <p className="text-xs text-slate-400 text-center -mt-1">
+        Toca un contenedor para reportar su estado
+      </p>
 
       {/* Bottom sheet */}
       {sheet && (
         <div className="fixed inset-0 bg-black/40 z-40 flex items-end">
-          <div ref={sheetRef} className="w-full max-w-[430px] mx-auto bg-white rounded-t-2xl p-6 pb-10 space-y-3 animate-[slideUp_.25s_ease-out]">
-            <p className="text-center font-bold text-slate-700 mb-4">¿Cómo está el contenedor?</p>
-            {REPORT_OPTIONS.map((opt) => (
-              <button
-                key={opt.key}
-                onClick={() => handleReport(opt.key)}
-                className={`w-full flex items-center gap-4 py-4 px-5 rounded-xl border-2 font-bold text-lg active:scale-[.98] transition-transform ${opt.textClass} ${opt.borderClass}`}
-              >
-                <span className="text-2xl">{opt.emoji}</span>
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+          <div
+            ref={sheetRef}
+            className="w-full max-w-[430px] mx-auto bg-white rounded-t-2xl p-6 pb-10 space-y-3 animate-[slideUp_.25s_ease-out]"
+          >
+            <p className="text-center font-bold text-slate-700 mb-1">
+              {selectedContainer?.label ?? 'Contenedor'}
+            </p>
 
-      {/* Desktop: indicator dot below button for extra context */}
-      {status && (
-        <div className="hidden md:flex items-center gap-3 px-1">
-          <div className={dotClass} />
-          <span className="text-sm text-slate-500">
-            Último estado registrado: <span className={`font-semibold ${textClass}`}>{label}</span>
-          </span>
+            {step === 'status' && (
+              <>
+                <p className="text-center text-sm text-slate-500 mb-3">¿Cómo está el contenedor?</p>
+                {REPORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => handleStatusSelect(opt.key)}
+                    className={`w-full flex items-center gap-4 py-4 px-5 rounded-xl border-2 font-bold text-lg active:scale-[.98] transition-transform ${opt.textClass} ${opt.borderClass}`}
+                  >
+                    <span className="text-2xl">{opt.emoji}</span>
+                    {opt.label}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {step === 'photo' && pendingStatus && (
+              <>
+                <p className="text-center text-sm text-slate-500 mb-2">
+                  Estado seleccionado:{' '}
+                  <strong className={STATUS_TEXT[pendingStatus]}>
+                    {STATUS_LABELS[pendingStatus]}
+                  </strong>
+                </p>
+
+                {/* Foto opcional */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handlePhotoSelect}
+                />
+
+                {photoPreviewUrl ? (
+                  <div className="relative">
+                    <img
+                      src={photoPreviewUrl}
+                      alt="Vista previa"
+                      className="w-full rounded-xl object-cover max-h-48"
+                    />
+                    <button
+                      onClick={() => { setPhotoFile(null); setPhotoPreviewUrl(null) }}
+                      className="absolute top-2 right-2 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                    >
+                      ✕
+                    </button>
+                    <p className="text-xs text-slate-400 text-center mt-1">
+                      Imagen pixelada automáticamente para proteger la privacidad
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn btn-outline btn-full"
+                  >
+                    📷 Adjuntar foto (opcional)
+                  </button>
+                )}
+
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={() => setStep('status')}
+                    className="btn btn-outline flex-1"
+                  >
+                    ← Volver
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="btn btn-primary flex-1"
+                  >
+                    {submitting ? 'Enviando…' : 'Enviar reporte'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

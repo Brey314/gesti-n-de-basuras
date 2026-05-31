@@ -26,6 +26,7 @@ class NotifPrefOut(BaseModel):
     push04: bool
     push05: bool
     push06: bool
+    push07: bool
 
 
 class NotifPrefUpdate(BaseModel):
@@ -35,3 +36,4 @@ class NotifPrefUpdate(BaseModel):
     push04: Optional[bool] = None
     push05: Optional[bool] = None
     push06: Optional[bool] = None
+    push07: Optional[bool] = None

@@ -13,5 +13,6 @@ class NotifPref(Base):
     push04 = Column(Boolean, default=False)  # reporte propio confirmado
     push05 = Column(Boolean, default=True)   # resumen diario
     push06 = Column(Boolean, default=False)  # alertas admin
+    push07 = Column(Boolean, default=False)  # eliminación automática de reportes
 
     user = relationship("User", back_populates="notif_pref")

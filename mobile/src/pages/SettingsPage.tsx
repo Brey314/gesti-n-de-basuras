@@ -17,6 +17,7 @@ const PREFS = [
   { key: 'push04', label: 'Camión pasó — contenedor libre',  sub: 'Recolección confirmada' },
   { key: 'push05', label: 'Cambios de horario',              sub: 'Actualizaciones del calendario' },
   { key: 'push06', label: 'Consejo semanal',                 sub: 'Tips de gestión de residuos' },
+  { key: 'push07', label: 'Mis reportes eliminados',         sub: 'Aviso cuando tus reportes expiran automáticamente' },
 ]
 
 function Toggle({ on, onChange, disabled }: { on: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {

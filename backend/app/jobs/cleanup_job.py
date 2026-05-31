@@ -14,9 +14,14 @@ _LOG_FILE = "logs/cleanup.log"
 
 
 def run_cleanup(db: Session) -> int:
+    from app.services import push_service
+
     now = datetime.now(timezone.utc)
     ts = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     try:
+        expired = db.query(Report).filter(Report.expires_at <= now).all()
+        affected_user_ids = list({r.user_id for r in expired})
+
         deleted = (
             db.query(Report)
             .filter(Report.expires_at <= now)
@@ -24,10 +29,14 @@ def run_cleanup(db: Session) -> int:
         )
         db.commit()
         line = f"{ts} | DELETED: {deleted} | STATUS: SUCCESS\n"
+
+        if affected_user_ids:
+            push_service.send_auto_delete_notice(affected_user_ids, db)
     except Exception as exc:
         db.rollback()
         line = f"{ts} | DELETED: 0 | STATUS: ERROR | MSG: {exc}\n"
         deleted = 0
+        push_service.send_admin_failure_alert(str(exc), db)
 
     with open(_LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line)

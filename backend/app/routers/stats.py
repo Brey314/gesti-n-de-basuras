@@ -15,7 +15,7 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 @router.get("/kpis")
 def get_kpis(
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER"))],
+    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER", "VIEWER"))],
 ):
     now = datetime.now(timezone.utc)
     today_str = now.strftime("%Y-%m-%d")
@@ -65,7 +65,7 @@ def get_kpis(
 @router.get("/daily")
 def get_daily(
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER"))],
+    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER", "VIEWER"))],
 ):
     now = datetime.now(timezone.utc)
     dates = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
@@ -86,7 +86,7 @@ def get_daily(
 @router.get("/hourly")
 def get_hourly(
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER"))],
+    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER", "VIEWER"))],
 ):
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=30)
@@ -124,7 +124,7 @@ def get_hourly(
 @router.get("/recent")
 def get_recent(
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER"))],
+    _: Annotated[User, Depends(require_roles("ADMIN", "RESEARCHER", "VIEWER"))],
 ):
     now = datetime.now(timezone.utc)
     reports = (
