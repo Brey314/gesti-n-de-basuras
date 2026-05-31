@@ -19,6 +19,8 @@ router = APIRouter(prefix="/export", tags=["export"])
 DAY_NAMES = {0: "Domingo", 1: "Lunes", 2: "Martes", 3: "Miércoles",
              4: "Jueves", 5: "Viernes", 6: "Sábado"}
 
+SHORT_DAY = {0: "Dom", 1: "Lun", 2: "Mar", 3: "Mie", 4: "Jue", 5: "Vie", 6: "Sab"}
+
 _TIPS = [
     "Saca la basura la noche anterior para mayor comodidad.",
     "Separa los reciclables para facilitar la recolección.",
@@ -123,6 +125,21 @@ def export_poster(
         .scalar()
     )
 
+    # Reports per actual calendar day for last 7 days
+    recent_reports = db.query(Report).filter(Report.created_at >= since_7).all()
+    by_date: dict[str, int] = defaultdict(int)
+    for r in recent_reports:
+        by_date[r.created_at.strftime("%Y-%m-%d")] += 1
+
+    reports_by_day = []
+    for offset in range(6, -1, -1):
+        day = now - timedelta(days=offset)
+        dow = int(day.strftime("%w"))  # 0=Sunday, 6=Saturday
+        reports_by_day.append({
+            "day_name": SHORT_DAY.get(dow, ""),
+            "count": by_date.get(day.strftime("%Y-%m-%d"), 0),
+        })
+
     return {
         "generated_at": now.isoformat(),
         "schedules": schedules_data,
@@ -130,4 +147,5 @@ def export_poster(
         "peak_hour": peak_hour,
         "total_reports_week": total_reports_week,
         "tip": random.choice(_TIPS),
+        "reports_by_day": reports_by_day,
     }

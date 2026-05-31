@@ -10,6 +10,7 @@ interface PosterData {
   peak_hour: string
   total_reports_week: number
   tip: string
+  reports_by_day: { day_name: string; count: number }[]
 }
 
 export function ExportPage() {
