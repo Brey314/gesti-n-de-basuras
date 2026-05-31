@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import api from '../api/client'
+import { PhotoModal } from '../components/PhotoModal'
 
-interface Report { id: string; status: string; created_at: string; days_until_expiry: number }
+interface Report {
+  id: string
+  status: string
+  created_at: string
+  days_until_expiry: number
+  photo_url: string | null
+}
 
 const STATUS_LABELS: Record<string, string> = {
   EMPTY: 'Vacío', HALF: 'Medio', FULL: 'Lleno', OVERFLOW: 'Desbordado',
@@ -19,6 +26,7 @@ export function HistoryPage() {
   const [reports,    setReports]    = useState<Report[]>([])
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [modalSrc,   setModalSrc]   = useState<string | null>(null)
 
   const load = async () => {
     try {
@@ -64,7 +72,7 @@ export function HistoryPage() {
             day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
           })
           return (
-            <div key={r.id} className="card px-5 py-4 flex items-center gap-4">
+            <div key={r.id} className="card px-5 py-4 flex items-center gap-3">
               <div className={dotClass} />
               <div className="flex-1 min-w-0">
                 <p className={`font-bold text-sm ${textClass}`}>
@@ -72,6 +80,18 @@ export function HistoryPage() {
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5 truncate">{date}</p>
               </div>
+              {r.photo_url && (
+                <button
+                  onClick={() => setModalSrc(r.photo_url!)}
+                  className="shrink-0 rounded-lg overflow-hidden border border-slate-200 hover:opacity-80 transition-opacity active:scale-95"
+                >
+                  <img
+                    src={r.photo_url}
+                    alt="Foto del reporte"
+                    className="w-14 h-14 object-cover"
+                  />
+                </button>
+              )}
               <div className="text-right shrink-0">
                 <p className="text-xl font-black text-slate-700">{r.days_until_expiry}</p>
                 <p className="text-xs text-slate-400">días</p>
@@ -80,6 +100,10 @@ export function HistoryPage() {
           )
         })}
       </div>
+
+      {modalSrc && (
+        <PhotoModal src={modalSrc} onClose={() => setModalSrc(null)} />
+      )}
     </div>
   )
 }

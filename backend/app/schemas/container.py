@@ -11,6 +11,7 @@ class ContainerOut(BaseModel):
     pos_y: float
     active: bool
     current_status: Optional[str] = None
+    current_photo_url: Optional[str] = None
 
 
 class ContainerStatusOut(BaseModel):
@@ -20,6 +21,7 @@ class ContainerStatusOut(BaseModel):
     alias: Optional[str]
     minutes_ago: Optional[int]
     message: Optional[str]
+    photo_url: Optional[str] = None
 
 
 class ContainerUpdate(BaseModel):

@@ -32,6 +32,7 @@ def _container_status(container_id: int, db: Session) -> ContainerStatusOut:
             alias=None,
             minutes_ago=None,
             message="Sin reportes recientes",
+            photo_url=None,
         )
 
     delta = now - report.created_at.replace(tzinfo=timezone.utc)
@@ -48,6 +49,7 @@ def _container_status(container_id: int, db: Session) -> ContainerStatusOut:
             alias=None,
             minutes_ago=None,
             message="Sin reportes recientes",
+            photo_url=None,
         )
 
     result = ContainerStatusOut(
@@ -57,6 +59,7 @@ def _container_status(container_id: int, db: Session) -> ContainerStatusOut:
         alias=alias,
         minutes_ago=minutes_ago,
         message=None,
+        photo_url=report.photo_url,
     )
 
     if minutes_ago > 240:
@@ -78,6 +81,7 @@ def list_containers(db: Annotated[Session, Depends(get_db)]):
             pos_y=c.pos_y,
             active=c.active,
             current_status=status_info.status,
+            current_photo_url=status_info.photo_url,
         )
         result.append(out)
     return result
@@ -123,4 +127,5 @@ def update_container(
         pos_y=container.pos_y,
         active=container.active,
         current_status=status_info.status,
+        current_photo_url=status_info.photo_url,
     )

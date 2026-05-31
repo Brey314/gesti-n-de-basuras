@@ -15,6 +15,16 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
+def _delete_photo_file(photo_url: str) -> None:
+    """Elimina el archivo físico de una foto si existe en static/photos/."""
+    try:
+        path = Path(photo_url.lstrip("/"))
+        if path.exists() and path.parent.name == "photos":
+            path.unlink()
+    except Exception:
+        pass
+
+
 @router.post("/", status_code=201)
 def create_report(
     body: dict,
@@ -32,6 +42,19 @@ def create_report(
             raise HTTPException(status_code=422, detail="Contenedor no válido")
 
     now = datetime.now(timezone.utc)
+
+    # Borrar la foto del reporte anterior de este contenedor (si existe)
+    if container_id is not None:
+        prev = (
+            db.query(Report)
+            .filter(Report.container_id == container_id, Report.photo_url.isnot(None))
+            .order_by(Report.created_at.desc())
+            .first()
+        )
+        if prev and prev.photo_url:
+            _delete_photo_file(prev.photo_url)
+            prev.photo_url = None
+
     report = Report(
         user_id=current_user.id,
         container_id=container_id,
@@ -80,6 +103,10 @@ async def upload_report_photo(
     report = db.query(Report).filter(Report.id == report_id, Report.user_id == current_user.id).first()
     if not report:
         raise HTTPException(status_code=404, detail="Reporte no encontrado")
+
+    # Si el reporte ya tenía foto, borrar el archivo anterior
+    if report.photo_url:
+        _delete_photo_file(report.photo_url)
 
     photo_dir = Path("static/photos")
     photo_dir.mkdir(parents=True, exist_ok=True)
