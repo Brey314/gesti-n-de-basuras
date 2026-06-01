@@ -5,6 +5,7 @@ export interface ContainerData {
   pos_y: number
   active: boolean
   current_status: string | null
+  current_photo_url: string | null
 }
 
 interface Props {

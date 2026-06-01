@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import api from '../api/client'
 import { useToast } from '../components/Toast'
 import { ContainerMap, type ContainerData } from '../components/ContainerMap'
+import { PhotoModal } from '../components/PhotoModal'
 
 const STATUS_LABELS: Record<string, string> = {
   EMPTY: 'VACÍO', HALF: 'MEDIO', FULL: 'LLENO', OVERFLOW: 'DESBORDADO',
@@ -54,11 +55,10 @@ export function HomePage() {
   const [containers, setContainers] = useState<ContainerData[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [sheet, setSheet] = useState(false)
-  const [step, setStep] = useState<'status' | 'photo'>('status')
-  const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+  const [submittingStatus, setSubmittingStatus] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [modalSrc, setModalSrc] = useState<string | null>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -86,8 +86,6 @@ export function HomePage() {
 
   const openSheet = (id: number) => {
     setSelectedId(id)
-    setStep('status')
-    setPendingStatus(null)
     setPhotoFile(null)
     setPhotoPreviewUrl(null)
     setSheet(true)
@@ -95,28 +93,25 @@ export function HomePage() {
 
   const closeSheet = () => {
     setSheet(false)
+    setPhotoFile(null)
     setPhotoPreviewUrl(null)
-  }
-
-  const handleStatusSelect = (status: string) => {
-    setPendingStatus(status)
-    setStep('photo')
   }
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    // Limpiar el value para poder seleccionar el mismo archivo dos veces
+    e.target.value = ''
     setPhotoFile(file)
     const blob = await pixelateImage(file)
     setPhotoPreviewUrl(URL.createObjectURL(blob))
   }
 
-  const handleSubmit = async () => {
-    if (!pendingStatus) return
-    setSubmitting(true)
+  const handleReport = async (status: string) => {
+    setSubmittingStatus(status)
     try {
       const res = await api.post('/reports/', {
-        status: pendingStatus,
+        status,
         container_id: selectedId,
       })
       if (photoFile) {
@@ -133,7 +128,7 @@ export function HomePage() {
     } catch {
       showToast('Error al enviar el reporte', 'error')
     } finally {
-      setSubmitting(false)
+      setSubmittingStatus(null)
     }
   }
 
@@ -141,6 +136,10 @@ export function HomePage() {
   const worst = worstStatus(containers)
   const worstLabel = worst ? STATUS_LABELS[worst] : null
   const worstTextClass = worst ? (STATUS_TEXT[worst] ?? 'text-slate-400') : 'text-slate-400'
+  const isSubmitting = submittingStatus !== null
+
+  // Contenedor con foto más reciente para mostrar en el panel de detalle
+  const containersWithPhoto = containers.filter((c) => c.current_status && c.current_photo_url)
 
   return (
     <div className="page-container">
@@ -166,6 +165,40 @@ export function HomePage() {
         )}
       </div>
 
+      {/* Fotos de reportes activos */}
+      {containersWithPhoto.length > 0 && (
+        <div className="card card-body space-y-2">
+          <p className="section-label">Fotos del estado actual</p>
+          <div className="flex flex-col gap-3">
+            {containersWithPhoto.map((c) => (
+              <div key={c.id} className="flex items-center gap-3">
+                <button
+                  onClick={() => setModalSrc(c.current_photo_url!)}
+                  className="shrink-0 rounded-xl overflow-hidden border border-slate-200 hover:opacity-80 transition-opacity active:scale-95"
+                >
+                  <img
+                    src={c.current_photo_url!}
+                    alt={`Foto ${c.label}`}
+                    className="w-20 h-20 object-cover"
+                  />
+                </button>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-700">{c.label}</p>
+                  <p className={`text-sm font-semibold ${STATUS_TEXT[c.current_status!] ?? 'text-slate-500'}`}>
+                    {STATUS_LABELS[c.current_status!] ?? c.current_status}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">Toca la foto para ampliar</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {modalSrc && (
+        <PhotoModal src={modalSrc} onClose={() => setModalSrc(null)} />
+      )}
+
       <p className="text-xs text-slate-400 text-center -mt-1">
         Toca un contenedor para reportar su estado
       </p>
@@ -177,88 +210,62 @@ export function HomePage() {
             ref={sheetRef}
             className="w-full max-w-[430px] mx-auto bg-white rounded-t-2xl p-6 pb-10 space-y-3 animate-[slideUp_.25s_ease-out]"
           >
-            <p className="text-center font-bold text-slate-700 mb-1">
+            {/* Encabezado */}
+            <p className="text-center font-bold text-slate-700">
               {selectedContainer?.label ?? 'Contenedor'}
             </p>
 
-            {step === 'status' && (
-              <>
-                <p className="text-center text-sm text-slate-500 mb-3">¿Cómo está el contenedor?</p>
-                {REPORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.key}
-                    onClick={() => handleStatusSelect(opt.key)}
-                    className={`w-full flex items-center gap-4 py-4 px-5 rounded-xl border-2 font-bold text-lg active:scale-[.98] transition-transform ${opt.textClass} ${opt.borderClass}`}
-                  >
-                    <span className="text-2xl">{opt.emoji}</span>
-                    {opt.label}
-                  </button>
-                ))}
-              </>
-            )}
+            {/* Foto opcional — visible desde el inicio */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={handlePhotoSelect}
+            />
 
-            {step === 'photo' && pendingStatus && (
-              <>
-                <p className="text-center text-sm text-slate-500 mb-2">
-                  Estado seleccionado:{' '}
-                  <strong className={STATUS_TEXT[pendingStatus]}>
-                    {STATUS_LABELS[pendingStatus]}
-                  </strong>
-                </p>
-
-                {/* Foto opcional */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={handlePhotoSelect}
+            {photoPreviewUrl ? (
+              <div className="relative">
+                <img
+                  src={photoPreviewUrl}
+                  alt="Vista previa"
+                  className="w-full rounded-xl object-cover max-h-40"
                 />
-
-                {photoPreviewUrl ? (
-                  <div className="relative">
-                    <img
-                      src={photoPreviewUrl}
-                      alt="Vista previa"
-                      className="w-full rounded-xl object-cover max-h-48"
-                    />
-                    <button
-                      onClick={() => { setPhotoFile(null); setPhotoPreviewUrl(null) }}
-                      className="absolute top-2 right-2 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
-                    >
-                      ✕
-                    </button>
-                    <p className="text-xs text-slate-400 text-center mt-1">
-                      Imagen pixelada automáticamente para proteger la privacidad
-                    </p>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="btn btn-outline btn-full"
-                  >
-                    📷 Adjuntar foto (opcional)
-                  </button>
-                )}
-
-                <div className="flex gap-3 pt-1">
-                  <button
-                    onClick={() => setStep('status')}
-                    className="btn btn-outline flex-1"
-                  >
-                    ← Volver
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting}
-                    className="btn btn-primary flex-1"
-                  >
-                    {submitting ? 'Enviando…' : 'Enviar reporte'}
-                  </button>
-                </div>
-              </>
+                <button
+                  onClick={() => { setPhotoFile(null); setPhotoPreviewUrl(null) }}
+                  className="absolute top-2 right-2 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs"
+                  aria-label="Quitar foto"
+                >
+                  ✕
+                </button>
+                <p className="text-xs text-slate-400 text-center mt-1">
+                  Imagen pixelada automáticamente para proteger la privacidad
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="btn btn-outline btn-full text-sm"
+                disabled={isSubmitting}
+              >
+                📷 Adjuntar foto (opcional)
+              </button>
             )}
+
+            {/* Selector de estado — el clic envía directamente */}
+            <p className="text-center text-sm text-slate-500">¿Cómo está el contenedor?</p>
+            {REPORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => handleReport(opt.key)}
+                disabled={isSubmitting}
+                className={`w-full flex items-center gap-4 py-4 px-5 rounded-xl border-2 font-bold text-lg active:scale-[.98] transition-transform disabled:opacity-60 ${opt.textClass} ${opt.borderClass}`}
+              >
+                <span className="text-2xl">{opt.emoji}</span>
+                {submittingStatus === opt.key ? 'Enviando…' : opt.label}
+              </button>
+            ))}
           </div>
         </div>
       )}
