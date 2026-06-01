@@ -42,7 +42,8 @@ export function ExportPage() {
       const res = await api.get<PosterData>('/export/poster')
       await generatePDF(res.data)
       showToast('PDF generado', 'success')
-    } catch {
+    } catch (err) {
+      console.error('PDF generation error:', err)
       showToast('Error al generar PDF', 'error')
     } finally {
       setLoadingPdf(false)
